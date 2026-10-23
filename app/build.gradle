@@ -54,6 +54,11 @@ android {
     }
 
     buildTypes {
+        // Keep preview installs separate from any installed upstream Cosmostation app.
+        debug {
+            applicationIdSuffix ".kaimacoinpreview"
+            versionNameSuffix "-kaimacoin-preview"
+        }
         release {
             minifyEnabled false
             zipAlignEnabled true
