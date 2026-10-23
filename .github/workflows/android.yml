@@ -1,45 +1,87 @@
-name: Android CI
+name: Kaimacoin Android Debug APK
 
 on:
+  workflow_dispatch:
   push:
-    branches: [ master ]
+    branches:
+      - kaimacoin-android-port
+    paths:
+      - 'app/**'
+      - 'proto/**'
+      - 'gradle/**'
+      - '*.gradle'
+      - '*.gradle.kts'
+      - 'gradle.properties'
+      - '.github/workflows/android.yml'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'app/**'
+      - 'proto/**'
+      - 'gradle/**'
+      - '*.gradle'
+      - '*.gradle.kts'
+      - 'gradle.properties'
+      - '.github/workflows/android.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: kaimacoin-android-debug-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  build:
+  build-debug:
+    name: Build installable debug APK
     runs-on: ubuntu-latest
-
+    timeout-minutes: 45
     steps:
-    - uses: actions/checkout@v2
-    - name: set up JDK 11
-      uses: actions/setup-java@v2
-      with:
-        java-version: '11'
-        distribution: 'adopt'
-        cache: gradle
+      - name: Checkout
+        uses: actions/checkout@v4
 
-    - name: Make keystore file
-      run: echo ${{ secrets.KEYSTORE }} | base64 -d > app/debug.keystore
-    - name: Make google service file
-      run: echo "${{ secrets.GOOGLE_SERVICE }}" | base64 -d > app/google-services.json
-    - name: Make debug google service file
-      run: echo "${{ secrets.DEBUG_GOOGLE_SERVICE }}" | base64 -d > app/src/debug/google-services.json
-    
-    - name: Grant execute permission for gradlew
-      run: chmod +x gradlew
-    - name: Build with Gradle
-      run: ./gradlew :app:assembleDebug
-      
-    - name: Set file name
-      run: |
-        echo "FILE_NAME=app/build/outputs/apk/debug/Cosmostation-debug-$(date "+%y%m%d%H%M")-${GITHUB_SHA::6}-${GITHUB_REF#refs/heads/}.apk" >> $GITHUB_ENV
-    - name: Rename file
-      run: mv app/build/outputs/apk/debug/app-debug.apk ${{ env.FILE_NAME }}
-      
-    - name: Upload to slack step
-      uses: adrey/slack-file-upload-action@master
-      continue-on-error: true
-      with:
-        token: ${{ secrets.SLACK_TOKEN }}
-        path: ${{ env.FILE_NAME }}
-        initial_comment: ${{ github.event.head_commit.message }}
-        channel: app-build
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: gradle
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: 'platform-tools'
+          accept-android-sdk-licenses: true
+
+      - name: Install Android SDK components
+        run: sdkmanager "platforms;android-36" "build-tools;35.0.0" "platform-tools"
+
+      - name: Make Gradle wrapper executable
+        run: chmod +x ./gradlew
+
+      - name: Build debug APK and retain diagnostics
+        shell: bash
+        run: |
+          set -o pipefail
+          ./gradlew --no-daemon --stacktrace --warning-mode all :app:assembleDebug 2>&1 | tee gradle-build.log
+
+      - name: Upload debug APK
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: kaimacoin-wallet-debug-${{ github.sha }}
+          path: app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload Gradle diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: kaimacoin-android-build-diagnostics-${{ github.run_id }}
+          path: |
+            gradle-build.log
+            app/build/reports/
+          if-no-files-found: warn
+          retention-days: 7
