@@ -33,12 +33,23 @@ android {
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    // Never reuse upstream signing credentials in this fork. Release signing is
+    // enabled only when the owner supplies their own credentials via environment.
+    def releaseStoreFile = System.getenv("ANDROID_RELEASE_STORE_FILE")
+    def releaseStorePassword = System.getenv("ANDROID_RELEASE_STORE_PASSWORD")
+    def releaseKeyAlias = System.getenv("ANDROID_RELEASE_KEY_ALIAS")
+    def releaseKeyPassword = System.getenv("ANDROID_RELEASE_KEY_PASSWORD")
+    def hasReleaseSigning = [releaseStoreFile, releaseStorePassword, releaseKeyAlias, releaseKeyPassword]
+        .every { it != null && !it.trim().isEmpty() }
+
     signingConfigs {
-        release {
-            storeFile file('eostartkeystore')
-            storePassword "dnjsjqlt034#"
-            keyAlias "key0"
-            keyPassword "dnjsjqlt034#"
+        if (hasReleaseSigning) {
+            release {
+                storeFile file(releaseStoreFile)
+                storePassword releaseStorePassword
+                keyAlias releaseKeyAlias
+                keyPassword releaseKeyPassword
+            }
         }
     }
 
@@ -47,9 +58,11 @@ android {
             minifyEnabled false
             zipAlignEnabled true
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
-            buildConfigField "String", "WALLETCONNECT_API_KEY", "\"${walletConnectApiKey}\""
-            buildConfigField "String", "SKIP_API_KEY", "\"${skipApiKey}\""
-            signingConfig signingConfigs.release
+            buildConfigField "String", "WALLETCONNECT_API_KEY", "\"\${walletConnectApiKey}\""
+            buildConfigField "String", "SKIP_API_KEY", "\"\${skipApiKey}\""
+            if (hasReleaseSigning) {
+                signingConfig signingConfigs.release
+            }
         }
     }
 
