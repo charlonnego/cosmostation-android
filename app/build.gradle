@@ -58,8 +58,8 @@ android {
             minifyEnabled false
             zipAlignEnabled true
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
-            buildConfigField "String", "WALLETCONNECT_API_KEY", "\"\${walletConnectApiKey}\""
-            buildConfigField "String", "SKIP_API_KEY", "\"\${skipApiKey}\""
+            buildConfigField "String", "WALLETCONNECT_API_KEY", "\"${walletConnectApiKey}\""
+            buildConfigField "String", "SKIP_API_KEY", "\"${skipApiKey}\""
             if (hasReleaseSigning) {
                 signingConfig signingConfigs.release
             }
